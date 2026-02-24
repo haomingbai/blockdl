@@ -6,6 +6,12 @@ import { Check, Copy, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useI18n } from "../i18n";
+import {
+  localizeGeneratedPythonCode,
+  localizeRuntimeMessage,
+  zhText,
+} from "../i18n/localize";
 import { parseGraphToDAG, type DAGResult } from "../lib/dag-parser";
 import {
   generateKerasCode,
@@ -56,9 +62,13 @@ function fallbackCopyToClipboard(text: string): void {
 // Sub-components
 interface APIBadgeProps {
   codeType: "sequential" | "functional";
+  localeLabel: {
+    functional: string;
+    sequential: string;
+  };
 }
 
-function APIBadge({ codeType }: APIBadgeProps) {
+function APIBadge({ codeType, localeLabel }: APIBadgeProps) {
   const isFunctional = codeType === "functional";
 
   return (
@@ -70,15 +80,15 @@ function APIBadge({ codeType }: APIBadgeProps) {
           : "bg-green-100 text-green-700 border-green-200"
       )}
     >
-      {isFunctional ? "Functional API" : "Sequential API"}
+      {isFunctional ? localeLabel.functional : localeLabel.sequential}
     </span>
   );
 }
 
-function BetaBadge() {
+function BetaBadge({ label }: { label: string }) {
   return (
     <span className="text-xs px-3 py-1.5 rounded-full font-medium border bg-orange-100 text-orange-700 border-orange-200">
-      Beta
+      {label}
     </span>
   );
 }
@@ -88,6 +98,11 @@ interface ActionButtonsProps {
   onCopy: () => void;
   isDisabled: boolean;
   isCopied: boolean;
+  labels: {
+    download: string;
+    copy: string;
+    copied: string;
+  };
 }
 
 function ActionButtons({
@@ -95,6 +110,7 @@ function ActionButtons({
   onCopy,
   isDisabled,
   isCopied,
+  labels,
 }: ActionButtonsProps) {
   const baseButtonClass = cn(
     UI_CONFIG.BUTTON_HEIGHT,
@@ -117,7 +133,7 @@ function ActionButtons({
           )}
         >
           <Download className="h-4 w-4 mr-2" />
-          Download .py
+          {labels.download}
         </Button>
         <Button
           variant="outline"
@@ -134,12 +150,12 @@ function ActionButtons({
           {isCopied ? (
             <>
               <Check className="h-4 w-4 mr-2" />
-              Copied!
+              {labels.copied}
             </>
           ) : (
             <>
               <Copy className="h-4 w-4 mr-2" />
-              Copy Code
+              {labels.copy}
             </>
           )}
         </Button>
@@ -185,6 +201,7 @@ interface CodeViewerProps {
 
 // Generates code from visual neural network graph
 export function CodeViewer({ className = "" }: CodeViewerProps) {
+  const { t, locale } = useI18n();
   const { nodes, edges } = useFlowStore();
   const [generatedCode, setGeneratedCode] = useState("");
   const [isCopied, setIsCopied] = useState(false);
@@ -192,6 +209,7 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
     "sequential"
   );
   const [framework, setFramework] = useState<"keras" | "pytorch">("keras");
+  const tt = (key: string, defaultValue: string) => t(key, { defaultValue });
 
   const resetCopyState = useCallback(() => {
     setTimeout(() => setIsCopied(false), UI_CONFIG.COPY_TIMEOUT);
@@ -203,33 +221,47 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
       const dagResult = parseGraphToDAG(nodes, edges);
 
       if (!dagResult.isValid) {
+        const localizedErrors = dagResult.errors.map((error) =>
+          localizeRuntimeMessage(locale, t, error)
+        );
         setGeneratedCode(
-          `# Error: Invalid network structure\n# ${dagResult.errors.join(
-            "\n# "
-          )}`
+          localizeGeneratedPythonCode(
+            locale,
+            `# Error: Invalid network structure\n# ${localizedErrors.join("\n# ")}`
+          )
         );
         return;
       }
 
       if (framework === "pytorch") {
         setCodeType("sequential"); // PyTorch doesn't need functional distinction
-        setGeneratedCode(generatePyTorchCode(dagResult.orderedNodes));
+        setGeneratedCode(
+          localizeGeneratedPythonCode(
+            locale,
+            generatePyTorchCode(dagResult.orderedNodes)
+          )
+        );
       } else {
         const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
 
         if (shouldUseFunctional) {
           setCodeType("functional");
           const functionalCode = await generateFunctionalKerasCode(dagResult);
-          setGeneratedCode(functionalCode);
+          setGeneratedCode(localizeGeneratedPythonCode(locale, functionalCode));
         } else {
           setCodeType("sequential");
-          setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
+          setGeneratedCode(
+            localizeGeneratedPythonCode(
+              locale,
+              generateKerasCode(dagResult.orderedNodes)
+            )
+          );
         }
       }
     };
 
     generateCode();
-  }, [nodes, edges, framework]);
+  }, [nodes, edges, framework, locale, t]);
 
   const handleCopyCode = useCallback(async () => {
     if (!generatedCode.trim()) return;
@@ -277,20 +309,39 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🐍</span>
                   <CardTitle className="text-xl text-slate-800 font-semibold">
-                    {framework === "pytorch" ? "PyTorch" : "Keras"} Code
+                    {framework === "pytorch"
+                      ? tt("ui.CodeViewer.pytorch", "PyTorch")
+                      : tt("ui.CodeViewer.keras", "Keras")}{" "}
+                    {tt("ui.CodeViewer.code", "Code")}
                   </CardTitle>
                 </div>
-                {framework === "keras" && <APIBadge codeType={codeType} />}
-                {framework === "pytorch" && <BetaBadge />}
+                {framework === "keras" && (
+                  <APIBadge
+                    codeType={codeType}
+                    localeLabel={{
+                      functional: zhText(locale, "Functional API", "函数式 API"),
+                      sequential: zhText(locale, "Sequential API", "顺序式 API"),
+                    }}
+                  />
+                )}
+                {framework === "pytorch" && (
+                  <BetaBadge label={tt("ui.CodeViewer.beta", "Beta")} />
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Select value={framework} onValueChange={(value: "keras" | "pytorch") => setFramework(value)}>
                   <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Framework" />
+                    <SelectValue
+                      placeholder={tt("ui.CodeViewer.framework", "Framework")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="keras">Keras</SelectItem>
-                    <SelectItem value="pytorch">PyTorch</SelectItem>
+                    <SelectItem value="keras">
+                      {tt("ui.CodeViewer.keras", "Keras")}
+                    </SelectItem>
+                    <SelectItem value="pytorch">
+                      {tt("ui.CodeViewer.pytorch", "PyTorch")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -300,6 +351,11 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
               onCopy={handleCopyCode}
               isDisabled={!generatedCode.trim()}
               isCopied={isCopied}
+              labels={{
+                download: tt("ui.CodeViewer.download_py", "Download .py"),
+                copy: tt("ui.CodeViewer.copy_code", "Copy Code"),
+                copied: tt("ui.CodeViewer.copied", "Copied!"),
+              }}
             />
           </CardHeader>
           <CardContent
@@ -312,14 +368,14 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
           </CardContent>
           <div className="px-2 text-center">
             <div className="text-xs text-slate-500 font-semibold">
-              Made with ❤️ by {"  "}
+              {tt("ui.CodeViewer.made_with_by", "Made with ❤️ by")}{" "}
               <a
                 href="https://aryagm.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-700 hover:underline transition-colors font-bold"
               >
-                @aryagm
+                {tt("ui.CodeViewer.aryagm", "@aryagm")}
               </a>
             </div>
           </div>

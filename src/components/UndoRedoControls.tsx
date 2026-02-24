@@ -5,6 +5,7 @@
 import { useEffect } from "react";
 import { Undo2, Redo2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { useI18n } from "../i18n";
 import { useFlowStore } from "../lib/flow-store";
 
 interface UndoRedoControlsProps {
@@ -12,6 +13,7 @@ interface UndoRedoControlsProps {
 }
 
 export function UndoRedoControls({ className = "" }: UndoRedoControlsProps) {
+  const { t } = useI18n();
   const { undo, redo, canUndo, canRedo } = useFlowStore();
 
   // Handle keyboard shortcuts
@@ -58,7 +60,9 @@ export function UndoRedoControls({ className = "" }: UndoRedoControlsProps) {
         size="sm"
         onClick={undo}
         disabled={!canUndo()}
-        title="Undo (Ctrl+Z)"
+        title={t("ui.UndoRedoControls.undo_ctrl_z", {
+          defaultValue: "Undo (Ctrl+Z)",
+        })}
         className="h-8 w-8 p-0"
       >
         <Undo2 className="h-4 w-4" />
@@ -69,7 +73,9 @@ export function UndoRedoControls({ className = "" }: UndoRedoControlsProps) {
         size="sm"
         onClick={redo}
         disabled={!canRedo()}
-        title="Redo (Ctrl+Shift+Z)"
+        title={t("ui.UndoRedoControls.redo_ctrl_shift_z", {
+          defaultValue: "Redo (Ctrl+Shift+Z)",
+        })}
         className="h-8 w-8 p-0"
       >
         <Redo2 className="h-4 w-4" />

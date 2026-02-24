@@ -11,6 +11,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "i18n:extract": "node --import tsx scripts/i18n/extract.ts",
+    "i18n:sync": "node --import tsx scripts/i18n/sync.ts",
     "preview": "vite preview"
   },
   "dependencies": {

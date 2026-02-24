@@ -12,6 +12,17 @@ import {
 } from "./ui/select";
 import { Button } from "./ui/button";
 import { Trash2 } from "lucide-react";
+import {
+  useI18n,
+  layerNameKey,
+  layerParamLabelKey,
+  layerParamOptionLabelKey,
+} from "../i18n";
+import {
+  localizeLayerChip,
+  localizeRuntimeMessage,
+  zhText,
+} from "../i18n/localize";
 import { getDefaultParams, getLayerFormSpec } from "../lib/layers/parameters";
 import { getLayerCategoryColors } from "../lib/categories";
 import { getLayerIcon } from "../lib/layer-definitions";
@@ -35,6 +46,7 @@ interface LayerNodeProps {
 }
 
 export function LayerNode({ id, data }: LayerNodeProps) {
+  const { t, locale } = useI18n();
   const {
     type,
     params = getDefaultParams(data.type),
@@ -49,8 +61,21 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const icon = getLayerIcon(type);
   const categoryColors = getLayerCategoryColors(type);
   const visibleParams = getParameterDisplayValues(type, params);
+  const localizedVisibleParams = visibleParams.map((param) =>
+    localizeLayerChip(locale, param)
+  );
   const totalParams = getTotalParameterCount(type);
   const showMoreIndicator = type !== "Input" && totalParams > 3;
+  const localizedTypeName = t(layerNameKey(type), { defaultValue: type });
+  const localizedShapeErrorMessage = shapeErrorMessage
+    ? localizeRuntimeMessage(locale, t, shapeErrorMessage, { layerType: type })
+    : undefined;
+  const shapeErrorTitle = localizedShapeErrorMessage
+    ? t("ui.LayerNode.shape_error_shapeerrormessage", {
+        defaultValue: "Shape Error: {shapeErrorMessage}",
+        params: { shapeErrorMessage: localizedShapeErrorMessage },
+      })
+    : null;
 
   const handleDoubleClick = () => {
     setIsOpen(true);
@@ -72,32 +97,45 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   };
 
   const renderParamEditor = (field: LayerFormField) => {
-    const { key, label, type, options, min, max, step, show } = field;
+    const { key, label, type: fieldType, options, min, max, step, show } = field;
 
     if (show && !show(editParams)) return null;
+
+    const localizedLabel = t(layerParamLabelKey(type, key), {
+      defaultValue: label,
+    });
 
     const updateParam = (newValue: string | number) => {
       setEditParams((prev) => ({ ...prev, [key]: newValue }));
     };
 
-    if (type === "select") {
+    if (fieldType === "select") {
       const currentValue = editParams[key]?.toString() || "";
       const selectValue =
         currentValue === "" && key === "activation" ? "none" : currentValue;
+      const placeholderExpr =
+        locale === "zh-CN" ? localizedLabel : localizedLabel.toLowerCase();
 
       return (
         <div key={key} className="space-y-1">
           <Label htmlFor={key} className="text-xs">
-            {label}
+            {localizedLabel}
           </Label>
           <Select value={selectValue} onValueChange={updateParam}>
             <SelectTrigger className="h-8">
-              <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+              <SelectValue
+                placeholder={t("ui.LayerNode.select_expr0", {
+                  defaultValue: "Select {expr0}",
+                  params: { expr0: placeholderExpr },
+                })}
+              />
             </SelectTrigger>
             <SelectContent>
               {options?.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(layerParamOptionLabelKey(type, key, option.value), {
+                    defaultValue: option.label,
+                  })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -109,18 +147,18 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     return (
       <div key={key} className="space-y-1">
         <Label htmlFor={key} className="text-xs">
-          {label}
+          {localizedLabel}
         </Label>
         <Input
           id={key}
-          type={type}
+          type={fieldType}
           value={editParams[key]?.toString() || ""}
           min={min}
           max={max}
           step={step}
           onChange={(e) => {
             const value =
-              type === "number" && e.target.value !== ""
+              fieldType === "number" && e.target.value !== ""
                 ? Number(e.target.value)
                 : e.target.value;
             updateParam(value);
@@ -167,7 +205,9 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                 handleDelete();
               }}
               className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg hover:shadow-xl hover:scale-110"
-              title="Delete this block"
+              title={t("ui.LayerNode.delete_this_block", {
+                defaultValue: "Delete this block",
+              })}
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -177,8 +217,12 @@ export function LayerNode({ id, data }: LayerNodeProps) {
               onDoubleClick={handleDoubleClick}
               title={
                 hasShapeError
-                  ? `Shape Error: ${shapeErrorMessage}`
-                  : `${type} - Double click to edit`
+                  ? (shapeErrorTitle ?? undefined)
+                  : `${localizedTypeName} - ${zhText(
+                      locale,
+                      "Double click to edit",
+                      "双击编辑"
+                    )}`
               }
             >
               <div
@@ -196,30 +240,34 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                     hasShapeError ? "text-red-700" : "text-slate-700"
                   }`}
                 >
-                  {type}
+                  {localizedTypeName}
                 </span>
                 {params.multiplier && Number(params.multiplier) > 1 && (
                   <span
                     className="bg-indigo-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
-                    title={`This layer will be repeated ${params.multiplier} times`}
+                    title={t("ui.LayerNode.this_layer_will_be_repeated_multiplier_times", {
+                      defaultValue: "This layer will be repeated {multiplier} times",
+                      params: { multiplier: Number(params.multiplier) },
+                    })}
                   >
-                    ×{params.multiplier}
+                    {t("ui.LayerNode.msg", { defaultValue: "×" })}
+                    {params.multiplier}
                   </span>
                 )}
                 {hasShapeError && (
                   <span
                     className="text-red-500 text-sm font-bold flex-shrink-0"
-                    title={`Shape Error: ${shapeErrorMessage}`}
+                    title={shapeErrorTitle ?? undefined}
                   >
-                    ⚠️
+                    {t("ui.LayerNode.msg_2", { defaultValue: "⚠️" })}
                   </span>
                 )}
               </div>
 
-              {visibleParams.length > 0 && (
+              {localizedVisibleParams.length > 0 && (
                 <div className="flex gap-1 mt-2 overflow-hidden">
                   <div className="flex gap-1 flex-1 min-w-0">
-                    {visibleParams
+                    {localizedVisibleParams
                       .slice(0, showMoreIndicator ? 2 : 3)
                       .map((param, index) => (
                         <span
@@ -233,15 +281,17 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                   </div>
                   {showMoreIndicator && (
                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium flex-shrink-0">
-                      +{totalParams - 2} more
+                      {t("ui.LayerNode.msg_3", { defaultValue: "+" })}
+                      {totalParams - 2}{" "}
+                      {t("ui.LayerNode.more", { defaultValue: "more" })}
                     </span>
                   )}
                 </div>
               )}
 
-              {hasShapeError && shapeErrorMessage && (
+              {hasShapeError && localizedShapeErrorMessage && (
                 <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-md border border-red-200 mt-2">
-                  {shapeErrorMessage}
+                  {localizedShapeErrorMessage}
                 </div>
               )}
             </div>
@@ -253,10 +303,14 @@ export function LayerNode({ id, data }: LayerNodeProps) {
             <div className="space-y-2">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <span>{icon}</span>
-                Edit {type} Layer
+                {t("ui.LayerNode.edit", { defaultValue: "Edit" })}{" "}
+                {localizedTypeName}{" "}
+                {t("ui.LayerNode.layer", { defaultValue: "Layer" })}
               </h4>
               <p className="text-xs text-muted-foreground">
-                Configure the parameters for this layer.
+                {t("ui.LayerNode.configure_the_parameters_for_this_layer", {
+                  defaultValue: "Configure the parameters for this layer.",
+                })}
               </p>
             </div>
 
@@ -264,7 +318,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
 
             <div className="flex gap-2">
               <Button onClick={handleSave} size="sm" className="flex-1">
-                Save
+                {t("ui.LayerNode.save", { defaultValue: "Save" })}
               </Button>
               <Button
                 onClick={handleCancel}
@@ -272,7 +326,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                 size="sm"
                 className="flex-1"
               >
-                Cancel
+                {t("ui.LayerNode.cancel", { defaultValue: "Cancel" })}
               </Button>
             </div>
           </div>

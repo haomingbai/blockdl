@@ -3,6 +3,7 @@ import { Play, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Logo } from "./Logo";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
+import { useI18n } from "../i18n";
 
 interface WelcomeModalProps {
   open?: boolean;
@@ -10,6 +11,7 @@ interface WelcomeModalProps {
 }
 
 export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
+  const { t } = useI18n();
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [hasVideoError, setHasVideoError] = useState(false);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
@@ -41,9 +43,16 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
         showCloseButton={false}
       >
         {/* Screen reader accessibility */}
-        <DialogTitle className="sr-only">Welcome to BlockDL</DialogTitle>
+        <DialogTitle className="sr-only">
+          {t("ui.WelcomeModal.welcome_to_blockdl", {
+            defaultValue: "Welcome to BlockDL",
+          })}
+        </DialogTitle>
         <DialogDescription className="sr-only">
-          Build neural network architectures visually with intuitive drag-and-drop blocks. Watch the demo video to get started.
+          {t("ui.WelcomeModal.build_neural_network_architectures_visually_with_intuitive_d", {
+            defaultValue:
+              "Build neural network architectures visually with intuitive drag-and-drop blocks. Watch the demo video to get started.",
+          })}
         </DialogDescription>
         
         <Button
@@ -63,13 +72,17 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
             </div>
             <div className="text-left">
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
-                Welcome to BlockDL
+                {t("ui.WelcomeModal.welcome_to_blockdl", {
+                  defaultValue: "Welcome to BlockDL",
+                })}
               </h1>
             </div>
           </div>
           <p className="text-slate-600 text-lg sm:text-xl leading-relaxed max-w-2xl mx-auto font-light">
-            Build neural network architectures visually with intuitive
-            drag-and-drop blocks
+            {t("ui.WelcomeModal.build_neural_network_architectures_visually_with_intuitive_d_2", {
+              defaultValue:
+                "Build neural network architectures visually with intuitive drag-and-drop blocks",
+            })}
           </p>
         </div>
 
@@ -79,7 +92,11 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
             <div className="absolute inset-0 mx-4 sm:mx-8 flex items-center justify-center bg-slate-100 aspect-video rounded-lg">
               <div className="flex flex-col items-center gap-3">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
-                <p className="text-slate-600 text-sm">Loading demo video...</p>
+                <p className="text-slate-600 text-sm">
+                  {t("ui.WelcomeModal.loading_demo_video", {
+                    defaultValue: "Loading demo video...",
+                  })}
+                </p>
               </div>
             </div>
           )}
@@ -89,10 +106,14 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
               <div className="text-center p-4 sm:p-8">
                 <Play className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-base sm:text-lg font-semibold text-slate-700 mb-2">
-                  Demo Video Unavailable
+                  {t("ui.WelcomeModal.demo_video_unavailable", {
+                    defaultValue: "Demo Video Unavailable",
+                  })}
                 </h3>
                 <p className="text-slate-600 text-sm sm:text-base">
-                  The demo video could not be loaded.
+                  {t("ui.WelcomeModal.the_demo_video_could_not_be_loaded", {
+                    defaultValue: "The demo video could not be loaded.",
+                  })}
                 </p>
               </div>
             </div>
@@ -107,7 +128,9 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
                 onError={handleVideoError}
               >
                 <source src="/demo-optimized.mp4" type="video/mp4" />
-                Your browser does not support the video tag.
+                {t("ui.WelcomeModal.your_browser_does_not_support_the_video_tag", {
+                  defaultValue: "Your browser does not support the video tag.",
+                })}
               </video>
             )
           )}

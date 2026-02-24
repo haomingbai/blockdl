@@ -1,14 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, X, Layers, Grid3X3 } from "lucide-react";
 import { Input } from "./ui/input";
 import { getLayerTypes } from "../lib/layer-definitions";
-import { getLayerCategories } from "../lib/categories";
+import { categories as layerCategoryDefs, getLayerCategories } from "../lib/categories";
 import {
   getAllTemplates,
   templateCategories,
   getTemplateCategoryColors,
   type NetworkTemplate,
 } from "../lib/templates";
+import {
+  useI18n,
+  categoryDescriptionKey,
+  categoryNameKey,
+  layerDescriptionKey,
+  layerNameKey,
+  tagKey,
+  templateCategoryDescriptionKey,
+  templateCategoryNameKey,
+  templateDescriptionKey,
+  templateNameKey,
+} from "../i18n";
+import { zhText } from "../i18n/localize";
 
 const CONFIG = {
   POLLING_INTERVAL: 100,
@@ -43,7 +56,13 @@ type TemplatesByCategory = {
     hoverColor: string;
     description: string;
     icon: string;
-    templates: NetworkTemplate[];
+    templates: Array<
+      NetworkTemplate & {
+        displayName: string;
+        displayDescription: string;
+        displayTags: string[];
+      }
+    >;
   };
 };
 
@@ -55,11 +74,13 @@ interface BlockPaletteProps {
 export default function BlockPalette({
   className = "",
 }: BlockPaletteProps = {}) {
+  const { t, locale } = useI18n();
   const [activeTab, setActiveTab] = useState<string>(CONFIG.TABS.LAYERS);
   const [layerTypes, setLayerTypes] = useState<LayerType[]>([]);
   const [layerCategories, setLayerCategories] = useState<CategoryType[]>([]);
   const [templates, setTemplates] = useState<NetworkTemplate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const tt = (key: string, defaultValue: string) => t(key, { defaultValue });
 
   const updateData = useCallback(() => {
     const types = getLayerTypes();
@@ -120,14 +141,71 @@ export default function BlockPalette({
     return () => clearInterval(interval);
   }, [layerTypes.length, layerCategories.length, templates.length, updateData]);
 
+  const localizedLayerTypes = useMemo(
+    () =>
+      layerTypes.map((layer) => ({
+        ...layer,
+        displayName: t(layerNameKey(layer.type), { defaultValue: layer.type }),
+        displayDescription: t(layerDescriptionKey(layer.type), {
+          defaultValue: layer.description,
+        }),
+      })),
+    [layerTypes, t]
+  );
+
+  const localizedLayerCategories = useMemo(
+    () =>
+      layerCategories.map((category) => {
+        const categoryKey = Object.entries(layerCategoryDefs).find(
+          ([, value]) => value.name === category.name
+        )?.[0];
+
+        return {
+          ...category,
+          name:
+            categoryKey !== undefined
+              ? t(categoryNameKey(categoryKey), { defaultValue: category.name })
+              : category.name,
+          description:
+            categoryKey !== undefined
+              ? t(categoryDescriptionKey(categoryKey), {
+                  defaultValue: category.description,
+                })
+              : category.description,
+        };
+      }),
+    [layerCategories, t]
+  );
+
+  const localizedTemplates = useMemo(
+    () =>
+      templates.map((template) => ({
+        ...template,
+        displayName: t(templateNameKey(template.id), {
+          defaultValue: template.name,
+        }),
+        displayDescription: t(templateDescriptionKey(template.id), {
+          defaultValue: template.description,
+        }),
+        displayTags: template.tags.map((tag) =>
+          t(tagKey(tag), { defaultValue: tag })
+        ),
+      })),
+    [templates, t]
+  );
+
   // Filter layers by search term
-  const filteredCategories = layerCategories
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredCategories = localizedLayerCategories
     .map((category) => {
-      const matchingLayers = layerTypes.filter(
+      const matchingLayers = localizedLayerTypes.filter(
         (layer) =>
           category.layerTypes.includes(layer.type) &&
-          (layer.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            layer.description.toLowerCase().includes(searchTerm.toLowerCase()))
+          (normalizedSearch === "" ||
+            layer.type.toLowerCase().includes(normalizedSearch) ||
+            layer.displayName.toLowerCase().includes(normalizedSearch) ||
+            layer.description.toLowerCase().includes(normalizedSearch) ||
+            layer.displayDescription.toLowerCase().includes(normalizedSearch))
       );
 
       return { ...category, layers: matchingLayers };
@@ -138,30 +216,31 @@ export default function BlockPalette({
   const templatesByCategory: TemplatesByCategory = {};
 
   Object.entries(templateCategories).forEach(([key, category]) => {
-    const categoryTemplates = templates.filter(
+    const categoryTemplates = localizedTemplates.filter(
       (template) =>
         template.category === key &&
-        (searchTerm === "" ||
-          template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          template.description
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          template.tags.some((tag) =>
-            tag.toLowerCase().includes(searchTerm.toLowerCase())
-          ))
+        (normalizedSearch === "" ||
+          template.name.toLowerCase().includes(normalizedSearch) ||
+          template.displayName.toLowerCase().includes(normalizedSearch) ||
+          template.description.toLowerCase().includes(normalizedSearch) ||
+          template.displayDescription.toLowerCase().includes(normalizedSearch) ||
+          template.tags.some((tag) => tag.toLowerCase().includes(normalizedSearch)) ||
+          template.displayTags.some((tag) => tag.toLowerCase().includes(normalizedSearch)))
     );
 
     if (categoryTemplates.length > 0) {
       const colors = getTemplateCategoryColors(key);
       templatesByCategory[key] = {
         category: key,
-        name: category.name,
+        name: t(templateCategoryNameKey(key), { defaultValue: category.name }),
         color: category.color,
         bgColor: colors.bg,
         borderColor: colors.border,
         textColor: colors.text,
         hoverColor: colors.hover,
-        description: category.description,
+        description: t(templateCategoryDescriptionKey(key), {
+          defaultValue: category.description,
+        }),
         icon: category.icon,
         templates: categoryTemplates,
       };
@@ -186,9 +265,9 @@ export default function BlockPalette({
               ? "bg-slate-900 text-white"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
           }`}
-        >
-          <Layers className="h-4 w-4" />
-          Layers
+          >
+            <Layers className="h-4 w-4" />
+          {tt("ui.BlockPalette.layers", "Layers")}
         </button>
         <button
           onClick={() => setActiveTab(CONFIG.TABS.TEMPLATES)}
@@ -197,9 +276,9 @@ export default function BlockPalette({
               ? "bg-slate-900 text-white"
               : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
           }`}
-        >
-          <Grid3X3 className="h-4 w-4" />
-          Templates
+          >
+            <Grid3X3 className="h-4 w-4" />
+          {tt("ui.BlockPalette.templates", "Templates")}
         </button>
       </div>
 
@@ -209,8 +288,8 @@ export default function BlockPalette({
           type="text"
           placeholder={
             activeTab === CONFIG.TABS.LAYERS
-              ? "Search layers..."
-              : "Search templates..."
+              ? zhText(locale, "Search layers...", "搜索层...")
+              : zhText(locale, "Search templates...", "搜索模板...")
           }
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -230,8 +309,14 @@ export default function BlockPalette({
         <div className="text-center py-8 text-slate-500">
           <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>
-            No {activeTab === CONFIG.TABS.LAYERS ? "layers" : "templates"} found
-            matching "{searchTerm}"
+            {tt("ui.BlockPalette.no", "No")}{" "}
+            {(activeTab === CONFIG.TABS.LAYERS
+              ? tt("ui.BlockPalette.layers", "Layers")
+              : tt("ui.BlockPalette.templates", "Templates")
+            ).toLowerCase()}{" "}
+            {tt("ui.BlockPalette.found_matching", 'found matching "')}
+            {searchTerm}
+            {tt("ui.BlockPalette.msg", '"')}
           </p>
         </div>
       ) : (
@@ -242,8 +327,12 @@ export default function BlockPalette({
         <div className="text-center py-8 text-slate-500">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mx-auto mb-2"></div>
           <p>
-            Loading {activeTab === CONFIG.TABS.LAYERS ? "layers" : "templates"}
-            ...
+            {tt("ui.BlockPalette.loading", "Loading")}{" "}
+            {(activeTab === CONFIG.TABS.LAYERS
+              ? tt("ui.BlockPalette.layers", "Layers")
+              : tt("ui.BlockPalette.templates", "Templates")
+            ).toLowerCase()}
+            {tt("ui.BlockPalette.msg_2", "...")}
           </p>
         </div>
       ) : (
@@ -281,11 +370,11 @@ export default function BlockPalette({
                         >
                           <span className="text-base">{layer.icon}</span>
                           <span className="font-medium text-sm">
-                            {layer.type}
+                            {layer.displayName}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed">
-                          {layer.description}
+                          {layer.displayDescription}
                         </p>
                       </div>
                     ))}
@@ -325,16 +414,16 @@ export default function BlockPalette({
                         >
                           <span className="text-base">{template.icon}</span>
                           <span className="font-medium text-sm">
-                            {template.name}
+                            {template.displayName}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed mb-2">
-                          {template.description}
+                          {template.displayDescription}
                         </p>
                         <div className="flex gap-1 flex-wrap">
-                          {template.tags.slice(0, 3).map((tag) => (
+                          {template.displayTags.slice(0, 3).map((tag, index) => (
                             <span
-                              key={tag}
+                              key={`${template.tags[index]}-${tag}`}
                               className="text-xs px-2 py-1 bg-slate-200 text-slate-600 rounded"
                             >
                               {tag}
@@ -342,7 +431,8 @@ export default function BlockPalette({
                           ))}
                           {template.tags.length > 3 && (
                             <span className="text-xs px-2 py-1 bg-slate-200 text-slate-600 rounded">
-                              +{template.tags.length - 3}
+                              {tt("ui.BlockPalette.msg_3", "+")}
+                              {template.tags.length - 3}
                             </span>
                           )}
                         </div>
